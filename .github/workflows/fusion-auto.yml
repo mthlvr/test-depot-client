@@ -1,0 +1,55 @@
+# Gabarit RucheLab « dépôt client » (ops/depot-client).
+# Chaque envoi d'une conversation Claude (branche claude/...) est versé dans main.
+# Conflit : une PR s'ouvre (RucheLab est notifié) et la prochaine conversation le résout.
+name: Fusion automatique dans main
+
+on:
+  push:
+    branches: ['claude/**']
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: fusion-main
+  cancel-in-progress: false
+
+jobs:
+  fusion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Verser la branche dans main
+        env:
+          BRANCHE: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "fusion-auto"
+          git config user.email "fusion-auto@users.noreply.github.com"
+          for essai in 1 2 3; do
+            git fetch -q origin main "$BRANCHE"
+            git checkout -q -B main origin/main
+            if git merge-base --is-ancestor "origin/$BRANCHE" main; then
+              echo "Déjà dans main."
+              exit 0
+            fi
+            if ! git merge --no-edit -q "origin/$BRANCHE" -m "Fusion automatique de $BRANCHE"; then
+              git merge --abort
+              OUVERTES=$(gh pr list --head "$BRANCHE" --base main --state open --json number --jq 'length')
+              if [ "$OUVERTES" = "0" ]; then
+                gh pr create --head "$BRANCHE" --base main \
+                  --title "Conflit à résoudre : $BRANCHE" \
+                  --body "La fusion automatique dans main a rencontré un conflit. La prochaine conversation Claude ouverte sur cette branche le résout ; sinon RucheLab s'en charge."
+              fi
+              echo "Conflit : PR ouverte."
+              exit 0
+            fi
+            git push -q origin main && { echo "Versé dans main."; exit 0; }
+            sleep 5
+          done
+          exit 1

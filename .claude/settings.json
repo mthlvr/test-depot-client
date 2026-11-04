@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sync-main.sh",
+            "timeout": 60,
+            "statusMessage": "Je récupère la dernière version..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/fin-de-reponse.sh",
+            "timeout": 60,
+            "statusMessage": "J'enregistre..."
+          }
+        ]
+      }
+    ]
+  }
+}
